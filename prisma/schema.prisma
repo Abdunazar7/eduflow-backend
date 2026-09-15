@@ -1,0 +1,453 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum UserRole {
+  PLATFORM_ADMIN
+  MANAGER
+  ADMIN
+  TEACHER
+  STUDENT
+}
+
+model Tenant {
+  id           Int      @id @default(autoincrement())
+  name         String
+  subdomain    String   @unique
+  logoUrl      String?
+  contactPhone String?
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+
+  users              User[]
+  branches           Branch[]
+  courses            Course[]
+  subscriptions      TenantSubscription[]
+  leads              Lead[]
+  transactions       Transaction[]
+  teacherSettlements TeacherSettlement[]
+  smsLogs            SmsLog[]
+  settings           SystemSetting?
+  leadStatuses       LeadStatus[]
+  groups             Group[]
+}
+
+model SubscriptionPlan {
+  id           Int     @id @default(autoincrement())
+  name         String
+  maxStudents  Int?
+  monthlyPrice Decimal
+
+  subscriptions TenantSubscription[]
+}
+
+model TenantSubscription {
+  id        Int      @id @default(autoincrement())
+  tenantId  Int
+  planId    Int
+  startDate DateTime
+  endDate   DateTime
+  status    String   @default("active")
+
+  tenant Tenant           @relation(fields: [tenantId], references: [id])
+  plan   SubscriptionPlan @relation(fields: [planId], references: [id])
+
+  @@index([tenantId])
+  @@index([planId])
+}
+
+// model Role {
+//   id          Int      @id @default(autoincrement())
+//   name        String   @unique
+//   description String?
+//   permissions Json?
+
+//   users User[]
+// }
+
+model User {
+  id           Int       @id @default(autoincrement())
+  tenantId     Int?
+  role         UserRole
+  phone        String    @unique
+  passwordHash String
+  hashedRt     String?
+  firstName    String
+  lastName     String
+  email        String?   @unique
+  photoUrl     String?
+  isActive     Boolean   @default(true)
+  lastLogin    DateTime?
+  createdAt    DateTime  @default(now())
+  notifications     Notification[]
+
+  tenant Tenant? @relation(fields: [tenantId], references: [id])
+
+  telegram TelegramAccount?
+
+  studentProfile StudentProfile?
+  teacherProfile TeacherProfile?
+  staffProfile   StaffProfile?
+
+  enrollments         Enrollment[]
+  attendance          Attendance[]
+  homeworkSubmissions HomeworkSubmission[] @relation("StudentSubmissions")
+  gradedHomeworks     HomeworkSubmission[] @relation("GraderSubmissions")
+  otps                Otp[]
+
+  mainGroups    Group[] @relation("MainTeacher")
+  supportGroups Group[] @relation("SupportTeacher")
+
+  lessons             Lesson[]
+  assignedLeads       Lead[]
+  transactions        Transaction[]       @relation("UserTransactions")
+  createdTransactions Transaction[]       @relation("TransactionCreator")
+  teacherSettlements  TeacherSettlement[]
+
+  @@index([tenantId, role])
+}
+
+model Notification {
+  id        Int      @id @default(autoincrement())
+  userId    Int      
+  type      String   // info, success, warning, error
+  title     String
+  message   String
+  link      String?  // optional in-app route to open
+  isRead    Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model Otp {
+  id        String   @id @default(uuid())
+  userId    Int
+  otpHash   String
+  attempts  Int      @default(0)
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+}
+
+model TelegramAccount {
+  id        Int      @id @default(autoincrement())
+  phone     String   @unique
+  chatId    String   @unique
+  username  String?
+  createdAt DateTime @default(now())
+
+  userId Int?  @unique
+  user   User? @relation(fields: [userId], references: [id])
+}
+
+model StudentProfile {
+  userId          Int       @id
+  birthDate       DateTime?
+  passportSeries  String?
+  address         String?
+  parentName      String?
+  parentPhone     String?
+  balance         Decimal   @default(0)
+  discountPercent Int       @default(0)
+  notes           String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model TeacherProfile {
+  userId         Int      @id
+  bio            String?
+  specialization String?
+  salaryType     String
+  salaryValue    Decimal
+  hiredDate      DateTime @default(now())
+  title          String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model StaffProfile {
+  userId      Int      @id
+  jobTitle    String?
+  fixedSalary Decimal?
+  kpiPercent  Decimal?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Branch {
+  id       Int     @id @default(autoincrement())
+  tenantId Int
+  name     String
+  address  String?
+  phone    String?
+
+  tenant Tenant  @relation(fields: [tenantId], references: [id])
+  rooms  Room[]
+  groups Group[]
+
+  @@index([tenantId])
+}
+
+model Room {
+  id       Int    @id @default(autoincrement())
+  branchId Int
+  name     String
+  capacity Int    @default(15)
+
+  branch Branch  @relation(fields: [branchId], references: [id])
+  groups Group[]
+
+  @@index([branchId])
+}
+
+model Course {
+  id          Int     @id @default(autoincrement())
+  tenantId    Int
+  name        String
+  description String?
+  isActive    Boolean @default(true)
+
+  tenant Tenant        @relation(fields: [tenantId], references: [id])
+  levels CourseLevel[]
+
+  @@index([tenantId])
+}
+
+model CourseLevel {
+  id             Int     @id @default(autoincrement())
+  courseId       Int
+  name           String
+  orderIndex     Int
+  price          Decimal
+  durationMonths Int     @default(3)
+
+  course Course  @relation(fields: [courseId], references: [id])
+  groups Group[]
+
+  @@index([courseId])
+}
+
+model Group {
+  id               Int       @id @default(autoincrement())
+  tenantId         Int
+  branchId         Int?
+  courseLevelId    Int
+  teacherId        Int
+  supportTeacherId Int?
+  name             String
+  startDate        DateTime?
+  endDate          DateTime?
+  status           String    @default("recruiting")
+  roomId           Int?
+
+  tenant      Tenant      @relation(fields: [tenantId], references: [id])
+  branch      Branch?     @relation(fields: [branchId], references: [id])
+  courseLevel CourseLevel @relation(fields: [courseLevelId], references: [id])
+
+  teacher        User  @relation("MainTeacher", fields: [teacherId], references: [id])
+  supportTeacher User? @relation("SupportTeacher", fields: [supportTeacherId], references: [id])
+
+  room Room? @relation(fields: [roomId], references: [id])
+
+  schedules   GroupSchedule[]
+  enrollments Enrollment[]
+  lessons     Lesson[]
+
+  @@index([tenantId])
+  @@index([teacherId])
+  @@index([supportTeacherId])
+  @@index([courseLevelId])
+  @@index([branchId])
+}
+
+model GroupSchedule {
+  id        Int      @id @default(autoincrement())
+  groupId   Int
+  dayOfWeek Int
+  startTime DateTime
+  endTime   DateTime
+
+  group Group @relation(fields: [groupId], references: [id])
+
+  @@index([groupId])
+}
+
+model Enrollment {
+  id            Int      @id @default(autoincrement())
+  studentId     Int
+  groupId       Int
+  joinedAt      DateTime
+  status        String   @default("active")
+  contractPrice Decimal?
+
+  student User  @relation(fields: [studentId], references: [id])
+  group   Group @relation(fields: [groupId], references: [id])
+
+  @@index([studentId])
+  @@index([groupId])
+}
+
+model Lesson {
+  id        Int      @id @default(autoincrement())
+  groupId   Int
+  date      DateTime
+  topic     String?
+  status    String   @default("planned")
+  teacherId Int?
+
+  group   Group @relation(fields: [groupId], references: [id])
+  teacher User? @relation(fields: [teacherId], references: [id])
+
+  attendance Attendance[]
+  homeworks  Homework[]
+
+  @@index([groupId, date])
+  @@index([teacherId])
+}
+
+model Attendance {
+  id        Int     @id @default(autoincrement())
+  lessonId  Int
+  studentId Int
+  status    String
+  comment   String?
+
+  lesson  Lesson @relation(fields: [lessonId], references: [id])
+  student User   @relation(fields: [studentId], references: [id])
+
+  @@unique([lessonId, studentId])
+
+  @@index([studentId])
+}
+
+model Homework {
+  id       Int     @id @default(autoincrement())
+  lessonId Int
+  title    String?
+  maxScore Int     @default(10)
+
+  lesson      Lesson               @relation(fields: [lessonId], references: [id])
+  submissions HomeworkSubmission[]
+
+  @@index([lessonId])
+}
+
+model HomeworkSubmission {
+  id          Int      @id @default(autoincrement())
+  homeworkId  Int
+  studentId   Int
+  fileUrl     String?
+  score       Int?
+  gradedBy    Int?
+  submittedAt DateTime @default(now())
+
+  homework Homework @relation(fields: [homeworkId], references: [id])
+  student  User     @relation("StudentSubmissions", fields: [studentId], references: [id])
+  grader   User?    @relation("GraderSubmissions", fields: [gradedBy], references: [id])
+
+  @@index([homeworkId])
+  @@index([studentId])
+}
+
+model LeadStatus {
+  id         Int    @id @default(autoincrement())
+  tenantId   Int?
+  name       String
+  orderIndex Int?
+
+  tenant Tenant? @relation(fields: [tenantId], references: [id])
+  leads  Lead[]
+
+  @@index([tenantId])
+}
+
+model Lead {
+  id         Int      @id @default(autoincrement())
+  tenantId   Int
+  firstName  String
+  phone      String
+  source     String?
+  statusId   Int?
+  assignedTo Int?
+  createdAt  DateTime @default(now())
+
+  tenant       Tenant      @relation(fields: [tenantId], references: [id])
+  status       LeadStatus? @relation(fields: [statusId], references: [id])
+  assignedUser User?       @relation(fields: [assignedTo], references: [id])
+
+  @@index([tenantId, createdAt])
+  @@index([statusId])
+  @@index([assignedTo])
+}
+
+model Transaction {
+  id            Int      @id @default(autoincrement())
+  tenantId      Int
+  userId        Int?
+  amount        Decimal
+  type          String
+  category      String?
+  paymentMethod String?
+  invoiceNumber String?
+  status        String?   // PAID | PENDING | OVERDUE | REFUNDED
+  dueDate       DateTime?
+  notes         String?
+  createdBy     Int?
+  createdAt     DateTime @default(now())
+
+  tenant  Tenant @relation(fields: [tenantId], references: [id])
+  user    User?  @relation("UserTransactions", fields: [userId], references: [id])
+  creator User?  @relation("TransactionCreator", fields: [createdBy], references: [id])
+
+  @@index([tenantId, createdAt])
+  @@index([userId])
+}
+
+model TeacherSettlement {
+  id               Int      @id @default(autoincrement())
+  tenantId         Int
+  teacherId        Int
+  month            DateTime
+  calculatedAmount Decimal?
+  paidAmount       Decimal?
+  status           String?
+
+  tenant  Tenant @relation(fields: [tenantId], references: [id])
+  teacher User   @relation(fields: [teacherId], references: [id])
+
+  @@index([tenantId])
+  @@index([teacherId])
+}
+
+model SmsLog {
+  id        Int      @id @default(autoincrement())
+  tenantId  Int?
+  phone     String
+  message   String
+  status    String?
+  createdAt DateTime @default(now())
+
+  tenant Tenant? @relation(fields: [tenantId], references: [id])
+
+  @@index([tenantId])
+}
+
+model SystemSetting {
+  tenantId         Int     @id
+  telegramBotToken String?
+  smsProviderToken String?
+  logoUrl          String?
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+}
