@@ -5,6 +5,7 @@ import { ScheduleModule } from '@nestjs/schedule';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 
 import { validateEnv } from './commons/config/env.validation';
+import { PER_MINUTE, phoneAndIp, sessionOrIp } from './commons/config/throttle';
 import { AccessTokenGuard, RolesGuard } from './commons/guards';
 
 import { AuthModule } from './auth/auth.module';
@@ -47,9 +48,14 @@ import { ReportsModule } from './reports/reports.module';
     // Without this, every @Cron in the app is silently never registered.
     ScheduleModule.forRoot(),
 
-    // Baseline limit for the whole API. Auth routes tighten it further.
+    // "default" counts per session (per IP when signed out); "account"
+    // counts per phone number per network and is only tightened on the
+    // auth routes, so its high baseline keeps it out of the way elsewhere.
     ThrottlerModule.forRoot({
-      throttlers: [{ ttl: 60_000, limit: 120 }],
+      throttlers: [
+        { name: 'default', ttl: PER_MINUTE, limit: 300, getTracker: sessionOrIp },
+        { name: 'account', ttl: PER_MINUTE, limit: 10_000, getTracker: phoneAndIp },
+      ],
       errorMessage: 'Too many requests. Please wait a minute and try again.',
     }),
 

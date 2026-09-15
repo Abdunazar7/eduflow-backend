@@ -29,15 +29,14 @@ Needs the migration `20260915120000_hardening` (`npm run db:deploy`).
 | `PATCH /student-profiles/:id` | `services/studentService.ts:201` | `PUT /student-profiles/:userId` |
 | `GET /grades`, `POST /grades/bulk` | `app/components/Teacher/AttendancePage.tsx:49,59` | No grades module exists. Scores live in `/homework-submissions`; presence lives in `/attendance` |
 
-**3. Handle `429 Too Many Requests`.** Nothing handles it today. Limits are per client IP, per minute:
+**3. Handle `429 Too Many Requests`.** Nothing handles it today. Limits are per minute. The auth routes count per phone number on each network and per network, so one person guessing a password is stopped without locking out a whole classroom behind one router. Everything else counts per signed-in session (per IP when signed out): 300 a minute. Going over returns `429`.
 
-| Route | Limit |
-|---|---|
-| `POST /auth/login` | 5 |
-| `POST /auth/resend-otp`, `/auth/forgot-password`, `/auth/init` | 3 |
-| `POST /auth/verify-activation` | 10 |
-| `POST /auth/refresh` | 30 |
-| Everything else | 120 |
+| Route | Per phone number | Per network (IP) |
+|---|---|---|
+| `POST /auth/login` | 5 | 100 |
+| `POST /auth/verify-activation` | 10 | 60 |
+| `POST /auth/resend-otp`, `/auth/forgot-password` | 3 | 30 |
+| `POST /auth/init` | | 3 |
 
 The body is `{ "message": "Too many requests. Please wait a minute and try again.", "statusCode": 429 }`.
 

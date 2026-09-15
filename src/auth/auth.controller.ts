@@ -54,7 +54,7 @@ export class AuthController {
   }
 
   @Public()
-  @Throttle({ default: { limit: 5, ttl: PER_MINUTE } })
+  @Throttle({ default: { limit: 100, ttl: PER_MINUTE }, account: { limit: 5, ttl: PER_MINUTE } })
   @Post('login')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Log in with phone and password' })
@@ -72,7 +72,7 @@ export class AuthController {
   }
 
   @Public()
-  @Throttle({ default: { limit: 10, ttl: PER_MINUTE } })
+  @Throttle({ default: { limit: 60, ttl: PER_MINUTE }, account: { limit: 10, ttl: PER_MINUTE } })
   @Post('verify-activation')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
@@ -85,7 +85,7 @@ export class AuthController {
   }
 
   @Public()
-  @Throttle({ default: { limit: 3, ttl: PER_MINUTE } })
+  @Throttle({ default: { limit: 30, ttl: PER_MINUTE }, account: { limit: 3, ttl: PER_MINUTE } })
   @Post('resend-otp')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Send a new activation code' })
@@ -103,7 +103,6 @@ export class AuthController {
 
   @Public()
   @UseGuards(RefreshTokenGuard)
-  @Throttle({ default: { limit: 30, ttl: PER_MINUTE } })
   @Post('refresh')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
@@ -124,7 +123,7 @@ export class AuthController {
   }
 
   @Public()
-  @Throttle({ default: { limit: 3, ttl: PER_MINUTE } })
+  @Throttle({ default: { limit: 30, ttl: PER_MINUTE }, account: { limit: 3, ttl: PER_MINUTE } })
   @Post('forgot-password')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
