@@ -65,7 +65,7 @@ The body is `{ "message": "Too many requests. Please wait a minute and try again
 - **Tenant reports** (`/reports/tenant-*`, `/enrollments-trends`, `/teacher-performance`, `/leads-metrics`) need `?tenantId=` when called by a `PLATFORM_ADMIN`. Response shapes are unchanged. `recentEnrollments[].student` now contains only `id`, `firstName`, `lastName`, `phone` and `photoUrl`.
 - **Files** now require login. `POST /files/upload` returns `{ url, filename, originalName, mimetype, size }`. Accepted types are images, PDF, Office documents and `.txt`, up to 10 MB.
 - **User responses** never include `passwordHash` or `hashedRt`.
-- **`/aichat`** is parked and returns `404`.
+- **`/aichat`** only exists when the server sets `AI_CHAT_ENABLED=true`; otherwise it returns `404`. When on, it needs a login and takes `{ message }` (up to 2000 characters). It returns `{ reply, model, tokens, remainingToday }`, `429` when the user reaches their minute or daily limit, and `503` or `504` when Groq has a problem. New: `GET /aichat/quota` returns `{ remainingToday, dailyLimit }`.
 
 ### Security note for the frontend repo
 

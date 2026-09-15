@@ -47,6 +47,13 @@ export function validateEnv(config: Record<string, unknown>) {
     );
   }
 
+  if (config.AI_CHAT_ENABLED === 'true' && !config.GROQ_API_KEY) {
+    throw new Error(
+      'AI_CHAT_ENABLED is true but GROQ_API_KEY is empty. Create a key at ' +
+        'https://console.groq.com/keys, or set AI_CHAT_ENABLED=false.',
+    );
+  }
+
   return config;
 }
 

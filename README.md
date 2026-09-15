@@ -52,7 +52,10 @@ The app will not start if a required variable is missing, if a JWT key is shorte
 | `APP_TIMEZONE` | | `Asia/Tashkent` | Clock for scheduled jobs |
 | `SUPER_ADMIN_PHONE` | for `/auth/init` | | Platform admin phone |
 | `SUPER_ADMIN_PASSWORD` | for `/auth/init` | | Platform admin password, 12+ characters |
-| `GROQ_*` | | | Only for the parked AI assistant |
+| `AI_CHAT_ENABLED` | | `false` | Turns on the AI assistant (see below) |
+| `GROQ_API_KEY` | if AI is on | | Your Groq API key |
+| `GROQ_MODEL` | | `openai/gpt-oss-120b` | Model the assistant uses |
+| `AI_MINUTE_LIMIT` / `AI_DAILY_LIMIT` | | `5` / `30` | AI messages each user may send |
 
 Generate a key with:
 
@@ -199,9 +202,28 @@ src/
   <feature>/    controller, service and DTOs per module
   prisma/       PrismaService (credential columns are omitted from every query by default)
 prisma/         schema.prisma and migrations
-docs/ai-chat/   notes for the parked AI assistant
+docs/ai-chat/   notes from the original Groq integration
 ```
 
-### Parked: AI assistant
+---
 
-The Groq-powered chat in `src/aichat` is switched off. To bring it back, uncomment `AichatModule` in `src/app.module.ts` and set `GROQ_API_KEY`. It will require a login automatically, like every other route. Before opening it to users, give it a tight per-user rate limit, because each message costs money.
+## AI assistant (optional)
+
+`POST /api/aichat` answers questions using a model hosted by [Groq](https://groq.com). It is **off by default**, and while it is off the route does not exist.
+
+**To turn it on**
+
+1. Sign in at [console.groq.com](https://console.groq.com) and create a key under **API Keys**. Groq has a free tier; your account's exact limits are on its **Limits** page.
+2. In `.env`, set `GROQ_API_KEY=<your key>` and `AI_CHAT_ENABLED=true`.
+3. Restart the API. It refuses to start if the switch is on but the key is empty.
+
+**How it is protected**
+
+- It needs a login, like every other route.
+- Each user gets `AI_MINUTE_LIMIT` messages a minute and `AI_DAILY_LIMIT` a day (5 and 30 by default), so one person cannot use up the free allowance everyone shares. Going over returns `429`. A failed call to Groq does not count.
+- The key lives only in `.env`, never in code or in responses. Message text is never logged, only who asked, token counts and timing.
+- If Groq is busy, down, or rejects the key or model, users get a clear `503` and the reason goes to the server log.
+
+**Contract.** Send `{ "message": "..." }`, up to 2000 characters. You get back `{ reply, model, tokens, remainingToday }`. `GET /api/aichat/quota` returns `{ remainingToday, dailyLimit }`.
+
+**Models get retired.** The original model, `llama-3.3-70b-versatile`, was shut down in August 2026. If the log says the model was rejected, pick a current one at [console.groq.com/docs/models](https://console.groq.com/docs/models) and set `GROQ_MODEL`.

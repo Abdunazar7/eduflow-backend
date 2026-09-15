@@ -1,5 +1,5 @@
 import { Module } from '@nestjs/common';
-import { ConfigModule } from '@nestjs/config';
+import { ConditionalModule, ConfigModule } from '@nestjs/config';
 import { APP_GUARD } from '@nestjs/core';
 import { ScheduleModule } from '@nestjs/schedule';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
@@ -38,8 +38,7 @@ import { TeacherSettlementsModule } from './teacher-settlements/teacher-settleme
 import { SmsLogsModule } from './sms-logs/sms-logs.module';
 import { SystemSettingsModule } from './system-settings/system-settings.module';
 import { ReportsModule } from './reports/reports.module';
-// [PARKED] AI Chat feature — disabled for now, re-enable by uncommenting this
-// import { AichatModule } from './aichat/aichat.module';
+import { AichatModule } from './aichat/aichat.module';
 
 @Module({
   imports: [
@@ -89,7 +88,12 @@ import { ReportsModule } from './reports/reports.module';
     SmsLogsModule,
     SystemSettingsModule,
     ReportsModule,
-    // [PARKED] AichatModule, // Groq AI assistant — see src/aichat/. Needs GROQ_API_KEY in .env before re-enabling.
+    // Off unless AI_CHAT_ENABLED=true, so the assistant exposes nothing and
+    // costs nothing until you configure your own Groq key.
+    ConditionalModule.registerWhen(
+      AichatModule,
+      (env: NodeJS.ProcessEnv) => env.AI_CHAT_ENABLED === 'true',
+    ),
   ],
   providers: [
     { provide: APP_GUARD, useClass: ThrottlerGuard },
